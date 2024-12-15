@@ -1,0 +1,6 @@
+@asp_geojson_api_vs_HostAddress = http://localhost:5108
+
+GET {{asp_geojson_api_vs_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
