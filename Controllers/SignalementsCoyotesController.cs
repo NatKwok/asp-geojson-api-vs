@@ -7,6 +7,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using asp_geojson_api_vs;
 using asp_geojson_api_vs.Models;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Build.Framework;
+using Newtonsoft.Json;
+using GeoJSON.Text.Geometry;
+using GeoJSON.Text.Feature;
+using FeatureCollection = GeoJSON.Text.Feature.FeatureCollection;
 
 namespace asp_geojson_api_vs.Controllers
 {
@@ -25,7 +31,46 @@ namespace asp_geojson_api_vs.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<SignalementsCoyote>>> GetSignalementsCoyotes()
         {
-            return await _context.SignalementsCoyotes.ToListAsync();
+            var feature = await _context.SignalementsCoyotes.ToListAsync();
+
+            //Map data to GeoJSON Features
+            var features = feature.Select(record =>
+            {
+
+                // Check if Geom is not null
+                if (record.Geom == null)
+                {
+                    // Handle cases where Geom is null (e.g., skip the record or provide a default value)
+                    return null;
+                }
+
+                // Replace with the actual fields for latitude and longitude in your model
+                var latitude = record.Geom.X;
+                var longitude = record.Geom.Y;
+
+                // Create a GeoJSON Point geometry
+                var point = new Point(new Position(latitude, longitude));
+
+                // Add additional properties from your model
+                var properties = new Dictionary<string, object>
+                    {
+                        { "Id", record.Id },
+                        { "Date Observed", record.DatObs }, // Example field
+                        { "Area", record.Territoire } // Example field
+                    };
+
+                // Create a GeoJSON Feature
+                return new Feature(point, properties);
+            }).ToList();
+
+            //Create a FeatureCollection
+            var featureCollection = new FeatureCollection(features);
+
+            //Serialize to GeoJSON
+            var geoJson = JsonConvert.SerializeObject(featureCollection);
+
+            // Return GeoJSON with appropriate content type
+            return Content(geoJson, "application/json");
         }
 
         // GET: api/SignalementsCoyotes/5

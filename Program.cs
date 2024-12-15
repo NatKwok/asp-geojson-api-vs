@@ -10,7 +10,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<MvcWebmapContext>(options =>
-    options.UseNpgsql("Host=localhost;Username=postgres;Password=^ytrO524FD;Database=hydrometric",
+    options.UseNpgsql("Host=localhost;Username=postgres;Password=^ytrO524FD;Database=mvc_webmap",
                       x => x.UseNetTopologySuite()));
 
 
