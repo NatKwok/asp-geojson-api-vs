@@ -10,9 +10,7 @@ using asp_geojson_api_vs.Models;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Build.Framework;
 using Newtonsoft.Json;
-using GeoJSON.Text.Geometry;
-using GeoJSON.Text.Feature;
-using FeatureCollection = GeoJSON.Text.Feature.FeatureCollection;
+using NetTopologySuite.Geometries;
 
 namespace asp_geojson_api_vs.Controllers
 {
@@ -31,7 +29,7 @@ namespace asp_geojson_api_vs.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<SignalementsCoyote>>> GetSignalementsCoyotes()
         {
-            var feature = await _context.SignalementsCoyotes.ToListAsync();
+            var feature = await _context.SignalementsCoyotes.Take(2).ToListAsync();
 
             //Map data to GeoJSON Features
             var features = feature.Select(record =>
@@ -44,30 +42,50 @@ namespace asp_geojson_api_vs.Controllers
                     return null;
                 }
 
-                // Replace with the actual fields for latitude and longitude in your model
-                var latitude = record.Geom.X;
-                var longitude = record.Geom.Y;
+                if (record.Geom is NetTopologySuite.Geometries.Point Point)
 
-                // Create a GeoJSON Point geometry
-                var point = new Point(new Position(latitude, longitude));
+                {
+                    // Replace with the actual fields for latitude and longitude in your model
+                    var latitude = record.Geom.X;
+                    var longitude = record.Geom.Y;
 
-                // Add additional properties from your model
-                var properties = new Dictionary<string, object>
+                    // Create a GeoJSON Point geometry
+                    var point = new Point(latitude, longitude);
+
+                    // Add additional properties from your model
+                    var properties = new Dictionary<string, object>
                     {
                         { "Id", record.Id },
                         { "Date Observed", record.DatObs }, // Example field
                         { "Area", record.Territoire } // Example field
                     };
 
-                // Create a GeoJSON Feature
-                return new Feature(point, properties);
-            }).ToList();
+                    // Create a GeoJSON Feature
+                    return new
+                    {
+                        type = "Feature",
+                        geometry = point,
+                        properties
+                    };
+                }
+
+                return null;
+            })
+            .Where(feature => feature != null)
+            .ToList();
 
             //Create a FeatureCollection
-            var featureCollection = new FeatureCollection(features);
-
+            var featureCollection = new
+            {
+                type = "FeatureCollection",
+                features
+            };
             //Serialize to GeoJSON
-            var geoJson = JsonConvert.SerializeObject(featureCollection);
+            var geoJson = JsonConvert.SerializeObject(featureCollection, Formatting.Indented,
+                    new JsonSerializerSettings()
+                    {
+                        ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
+                    });
 
             // Return GeoJSON with appropriate content type
             return Content(geoJson, "application/json");
