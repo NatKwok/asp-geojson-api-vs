@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using asp_geojson_api_vs;
 using asp_geojson_api_vs.Models;
+using Newtonsoft.Json;
 
 namespace asp_geojson_api_vs.Controllers
 {
@@ -25,7 +26,60 @@ namespace asp_geojson_api_vs.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Ecoterritoire>>> GetEcoterritoires()
         {
-            return await _context.Ecoterritoires.ToListAsync();
+            var feature = await _context.Ecoterritoires.Take(2).ToListAsync();
+            var features = feature.Select(record =>
+            {
+                if (record.Geom == null)
+                    return null;
+
+                if (record.Geom is NetTopologySuite.Geometries.Polygon polygon)
+                {
+                    var polygonCoord = new List<List<Double[]>>()
+                    {
+                        polygon.ExteriorRing.Coordinates
+                                .Select(coord => new[] { coord.X, coord.Y }) // Flip to [latitude, longitude]
+                                .ToList()
+                    };
+
+                    var geoJsonPolygon = new
+                    {
+                        type = "Polygon",
+                        coordinates = polygonCoord
+                    };
+
+                    // Add additional properties from your model
+                    var properties = new Dictionary<string, object>
+                    {
+                        { "Id", record.Id },
+                        { "Description", record.Text },
+                        { "Area", record.ShapeArea }
+                    };
+
+                    // Create a GeoJSON Feature
+                    return new
+                    {
+                        type = "Feature",
+                        geometry = polygonCoord,
+                        properties
+                    };
+                }
+
+                return null;
+            })
+                .Where(feature => feature != null) // Filter out null features
+                .ToList();
+
+            var featureCollection = new
+            {
+                type = "FeatureCollection",
+                features
+            };
+
+            // Serialize to GeoJSON
+            var geoJson = JsonConvert.SerializeObject(featureCollection);
+
+            // Return GeoJSON with the appropriate content type
+            return Content(geoJson, "application/json");
         }
 
         // GET: api/Ecoterritoires/5
